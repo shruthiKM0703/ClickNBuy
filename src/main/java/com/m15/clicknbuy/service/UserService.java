@@ -31,8 +31,7 @@ public interface UserService {
 
 	String checkout(HttpSession session, Principal principal, ModelMap map);
 
-	String paymentSuccess(String paymentId, String orderId, String signature, String address, Principal principal, HttpSession session,
-			ModelMap map);
+	String dummyPayment(String address, Principal principal, HttpSession session, ModelMap map);
 
 	String viewOrders(Principal principal, HttpSession session, ModelMap map);
 }

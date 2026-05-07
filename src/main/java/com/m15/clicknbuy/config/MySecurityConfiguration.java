@@ -21,7 +21,7 @@ public class MySecurityConfiguration {
 	SecurityFilterChain chain(HttpSecurity http) throws Exception {
 		return http.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(
-						req -> req.requestMatchers("/", "/register", "/otp", "/resend-otp", "/forgot-password","/reset-password")
+						req -> req.requestMatchers("/", "/register", "/otp", "/resend-otp", "/forgot-password","/reset-password", "/uploads/**")
 								.permitAll().requestMatchers("/user/**").hasRole("USER").requestMatchers("/admin/**")
 								.hasRole("ADMIN").anyRequest().authenticated())
 				.formLogin(form -> form.loginPage("/login").defaultSuccessUrl("/", true).permitAll())

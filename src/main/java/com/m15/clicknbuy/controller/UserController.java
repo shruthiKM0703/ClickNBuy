@@ -75,11 +75,10 @@ public class UserController {
 		return userService.checkout(session, principal, map);
 	}
 
-	@GetMapping("/user/payment/success")
-	public String paymentSuccess(@RequestParam("paymentId") String paymentId, @RequestParam("orderId") String orderId,
-			@RequestParam("signature") String signature, @RequestParam("address") String address,Principal principal, HttpSession session,
-			ModelMap map) {
-		return userService.paymentSuccess(paymentId, orderId, signature, address,principal, session, map);
+	@PostMapping("/user/payment/dummy")
+	public String dummyPayment(@RequestParam("address") String address, Principal principal,
+			HttpSession session, ModelMap map) {
+		return userService.dummyPayment(address, principal, session, map);
 	}
 
 	@GetMapping("/user/orders")

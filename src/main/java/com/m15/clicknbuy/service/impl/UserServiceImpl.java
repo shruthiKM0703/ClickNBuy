@@ -5,10 +5,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.ModelMap;
@@ -28,9 +27,6 @@ import com.m15.clicknbuy.repository.OrderRepository;
 import com.m15.clicknbuy.repository.ProductRepository;
 import com.m15.clicknbuy.service.UserService;
 import com.m15.clicknbuy.util.OtpSender;
-import com.razorpay.RazorpayClient;
-import com.razorpay.RazorpayException;
-import com.razorpay.Utils;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -49,12 +45,6 @@ public class UserServiceImpl implements UserService {
 
 	@Autowired
 	CartItemRepository itemRepository;
-
-	@Value("${razorpay.id}")
-	private String razorpayKeyId;
-
-	@Value("${razorpay.secret}")
-	private String razorpayKeySecret;
 
 	@Autowired
 	OtpSender otpSender;
@@ -180,6 +170,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@SuppressWarnings("null")
 	public String addToCart(Long id, HttpSession session, Principal principal) {
 		Product product = productRepository.findById(id).orElseThrow();
 		if (product.getStock() > 0) {
@@ -246,6 +237,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@SuppressWarnings("null")
 	public String increase(HttpSession session, Long id, ModelMap map) {
 		CartItem item = itemRepository.findById(id).orElseThrow();
 		Product product = item.getProduct();
@@ -263,6 +255,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@SuppressWarnings("null")
 	public String decrease(HttpSession session, Long id, ModelMap map) {
 		CartItem item = itemRepository.findById(id).orElseThrow();
 		Product product = item.getProduct();
@@ -288,106 +281,61 @@ public class UserServiceImpl implements UserService {
 		if (items.isEmpty()) {
 			session.setAttribute("error", "No Products in Cart");
 			return "redirect:/";
-		} else {
-			try {
-				double total = items.stream().mapToDouble(x -> x.getProduct().getPrice() * x.getQuantity()).sum();
-				double roundedTotal = Math.round(total * 100.0) / 100.0; // Round to 2 decimal places
-
-				RazorpayClient razorpay = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
-				JSONObject orderRequest = new JSONObject();
-				orderRequest.put("amount", (int) (roundedTotal * 100));
-				orderRequest.put("currency", "INR");
-				orderRequest.put("receipt", "order_" + System.currentTimeMillis());
-
-				com.razorpay.Order order = razorpay.orders.create(orderRequest);
-
-				map.put("razorpayOrderId", order.get("id"));
-				map.put("razorpayKeyId", razorpayKeyId);
-				map.put("amount", roundedTotal);
-				map.put("currency", "INR");
-				map.put("userEmail", user.getEmail());
-				map.put("userContact", user.getMobile());
-				map.put("userName", user.getName());
-				map.put("items", items);
-				map.put("user", user);
-				map.put("total", roundedTotal);
-
-				return "checkout.html";
-			} catch (RazorpayException e) {
-				session.setAttribute("error", "Payment initialization failed. Please try again.");
-				return "redirect:/user/cart";
-			}
 		}
+		double total = items.stream().mapToDouble(x -> x.getProduct().getPrice() * x.getQuantity()).sum();
+		double roundedTotal = Math.round(total * 100.0) / 100.0;
+		map.put("items", items);
+		map.put("user", user);
+		map.put("total", roundedTotal);
+		return "checkout.html";
 	}
 
 	@Override
-	public String paymentSuccess(String paymentId, String orderId, String signature, String address,
-			Principal principal,
-			HttpSession session, ModelMap map) {
-		try {
-			String data = orderId + "|" + paymentId;
-			boolean isValidSignature = Utils.verifySignature(data, signature, razorpayKeySecret);
+	@SuppressWarnings("null")
+	public String dummyPayment(String address, Principal principal, HttpSession session, ModelMap map) {
+		String email = principal.getName();
+		User user = userDao.findByEmail(email).orElseThrow();
 
-			System.out.println("----------2--------------");
-			if (!isValidSignature) {
-				map.put("error", "Payment verification failed!");
-				return "redirect:/checkout";
-			}
-
-			System.out.println("----------3--------------");
-			// Get the current user
-			String email = principal.getName();
-			User user = userDao.findByEmail(email).orElseThrow();
-			if (user == null) {
-				return "redirect:/login";
-			}
-
-			// Create a new order
-			Order order = new Order();
-			order.setUser(user);
-			order.setRazorpayOrderId(orderId);
-			order.setRazorpayPaymentId(paymentId);
-			order.setRazorpaySignature(signature);
-			order.setOrderDate(LocalDateTime.now());
-			order.setStatus("PAID");
-			order.setDeliveryAddress(address);
-
-			// Get cart items and calculate total
-			List<CartItem> cartItems = itemRepository.findByUser(user);
-			// Create order items
-			List<OrderItem> orderItems = cartItems.stream()
-				.map(cartItem -> {
-					OrderItem orderItem = new OrderItem();
-					orderItem.setOrder(order);
-					orderItem.setProduct(cartItem.getProduct());
-					orderItem.setQuantity(cartItem.getQuantity());
-					orderItem.setPrice(cartItem.getProduct().getPrice());
-					return orderItem;
-				})
-				.toList();
-			
-			// Calculate total amount
-			double totalAmount = cartItems.stream()
-				.mapToDouble(cartItem -> cartItem.getQuantity() * cartItem.getProduct().getPrice())
-				.sum();
-			
-			// Set the total amount and save the order
-			order.setTotalAmount(totalAmount);
-			orderRepository.save(order);
-			
-			// Save all order items
-			orderItemRepository.saveAll(orderItems);
-
-			// Clear the cart
-			itemRepository.deleteAll(cartItems);
-
-			map.put("success", "Order placed successfully!");
-			return "redirect:/user/orders";
-
-		} catch (RazorpayException e) {
-			map.put("error", "Payment processing failed: " + e.getMessage());
-			return "redirect:/checkout";
+		List<CartItem> cartItems = itemRepository.findByUser(user);
+		if (cartItems.isEmpty()) {
+			session.setAttribute("error", "Your cart is empty.");
+			return "redirect:/";
 		}
+
+		// Create the order
+		Order order = new Order();
+		order.setUser(user);
+		order.setRazorpayOrderId("DEMO-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+		order.setRazorpayPaymentId("DEMO-PAY-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+		order.setRazorpaySignature("DEMO_SIGNATURE");
+		order.setOrderDate(LocalDateTime.now());
+		order.setStatus("PAID");
+		order.setDeliveryAddress(address);
+
+		// Build order items
+		List<OrderItem> orderItems = cartItems.stream().map(cartItem -> {
+			OrderItem orderItem = new OrderItem();
+			orderItem.setOrder(order);
+			orderItem.setProduct(cartItem.getProduct());
+			orderItem.setQuantity(cartItem.getQuantity());
+			orderItem.setPrice(cartItem.getProduct().getPrice());
+			return orderItem;
+		}).toList();
+
+		// Calculate total
+		double totalAmount = cartItems.stream()
+				.mapToDouble(c -> c.getQuantity() * c.getProduct().getPrice()).sum();
+		order.setTotalAmount(totalAmount);
+
+		// Save order and items
+		orderRepository.save(order);
+		orderItemRepository.saveAll(orderItems);
+
+		// Clear the cart
+		itemRepository.deleteAll(cartItems);
+
+		session.setAttribute("success", "Order placed successfully! Order ID: " + order.getRazorpayOrderId());
+		return "redirect:/user/orders";
 	}
 
 	@Override

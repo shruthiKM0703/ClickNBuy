@@ -21,10 +21,12 @@ public class UserDao {
 		return userRepository.existsByMobile(mobile);
 	}
 
+	@SuppressWarnings("null")
 	public void save(User user) {
 		userRepository.save(user);
 	}
 
+	@SuppressWarnings("null")
 	public User findById(Long id) {
 		return userRepository.findById(id).orElseThrow();
 	}
