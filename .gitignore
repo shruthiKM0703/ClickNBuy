@@ -31,3 +31,34 @@ build/
 
 ### VS Code ###
 .vscode/
+############################
+# Logs
+############################
+*.log
+logs/
+
+############################
+# Environment & Secrets
+############################
+.env
+.env.*
+*.env
+application-local.properties
+application-dev.properties
+application-prod.properties
+src/main/resources/application.properties
+
+############################
+# OS Files
+############################
+.DS_Store
+Thumbs.db
+
+
+############################
+# Personal / Documentation Files
+############################
+Explanation.txt
+*.zip
+*.rar
+*.7z
